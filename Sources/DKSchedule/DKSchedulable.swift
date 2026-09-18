@@ -7,7 +7,7 @@
 
 import Foundation
 
-public protocol Schedulable: Identifiable where ID == UUID {
+public protocol Schedulable: Identifiable, Sendable where ID == UUID {
     var nextDueDate: Date { get }
     var rule: RecurrenceRule { get }
     var isReminderEnable: Bool { get }
