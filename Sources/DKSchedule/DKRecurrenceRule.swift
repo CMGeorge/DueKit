@@ -7,62 +7,45 @@
 
 import Foundation
 
-public enum RecurrenceRule: Sendable, Equatable, Codable {
-    case monthly(every: Int, day: Int)
-    case yearly(every: Int, month: Int, day: Int)
+//full change the structure. struct i belive is better having more control, specailly at initialisation
+public struct RecurrenceRule: Sendable, Hashable {
 
+    public enum Frequency: Hashable, Sendable {
+        case monthly(day: Int)
+        case yearly(month: Int, day: Int)
+    }
+
+    public let frequency: Frequency
+    public let interval: Int
+
+    public static let monthlyIntervals = 1...(12 * 100)
+    public static let yearlyIntervals = 1...110
+    public static let supportedYears = 2016...2126 //i dont see anyone using this code in 100 years, and 2016 just for old data to work
 }
 
+// MARK: - Life Cycle
 extension RecurrenceRule {
-
-}
-//public struct RecurrenceRule: Equatable, Sendable {
-//extension RecurrenceRule {
-//    public enum Unit: Equatable, Sendable {
-//        //no psecial cases for this
-//        //        case  day
-//        //        case week
-//        case month
-//        case year
-//    }
-//    public init(unit: Unit, interval: Int = 1, dayAnchor: Int, monthAnchor: Int? = nil) {
-//        //preconditioning
-//        precondition(interval >= 1, "interval must be at least 1")
-//        precondition((1...31).contains(dayAnchor), "dayAnchor must be 1...31")
-//        if let monthAnchor { precondition((1...12).contains(monthAnchor), "monthAnchor must be 1...12") }
-//        if unit == .year { precondition(monthAnchor != nil, "yearly rules need monthAnchor") }
-//
-//        //init
-//        self.unit = unit
-//        self.interval = interval
-//        self.dayAnchor = dayAnchor
-//        self.monthAnchor = monthAnchor
-//    }
-//}
-
-//convenient initialzers
-extension RecurrenceRule {
+    public init(_ frequency: Frequency, every interval: Int = 1)
+        throws(RecurrenceRuleError)
+    {
+        try Self.validate(frequency, every: interval)
+        self.frequency = frequency
+        self.interval = interval
+    }
+    //conveninet contructors
     public init(monthlyEvery every: Int, on day: Int)
         throws(RecurrenceRuleError)
     {
-        let rule = RecurrenceRule.monthly(every: every, day: day)
-        //        guard rule.isValid else {
-        //            return nil
-        //        }
-        try rule.validate()
-        self = rule
+        try self.init(.monthly(day: day), every: every)
     }
     public init(yearlyEvery every: Int, on month: Int, and day: Int)
         throws(RecurrenceRuleError)
     {
-        let rule = RecurrenceRule.yearly(every: every, month: month, day: day)
-        //        guard rule.isValid else {
-        //            return nil
-        //        }
-        try rule.validate()
-        self = rule
+        try self.init(.yearly(month: month, day: day), every: every)
     }
 }
+
+
 //helpers
 //Calendar to allow uage of different type of calendars. Tests whould be implemented
 extension RecurrenceRule {
@@ -70,62 +53,42 @@ extension RecurrenceRule {
     //        guard toValidate>=1 else{ throw RecurrenceRuleError.intervalShouldBeGraterThanZero }
     //    }
 
-    //Expand
-
-    public func validate() throws(RecurrenceRuleError) {
-
-        switch self {
-        case .monthly(let every, let day):
-            try generalThrow(every: every, day: day)
-        case .yearly(let every, let month, let day):
-            try generalThrow(every: every, day: day)
+    public static func validate(_ frequency: Frequency, every interval: Int)
+        throws(RecurrenceRuleError)
+    {
+        switch frequency {
+        case .monthly(let day):
+            try generalThrow(
+                every: interval,
+                allowed: monthlyIntervals,
+                day: day
+            )
+        case .yearly(let month, let day):
+            try generalThrow(
+                every: interval,
+                allowed: yearlyIntervals,
+                day: day
+            )
             guard (1...12).contains(month) else {
                 throw .monthOutOfRange(month)
             }
-            guard day <= Self.lastDayOfTheMonth(in: month) else {
+            guard day <= lastDayOfTheMonth(in: month) else {
                 throw .monthDayIsOutOfMonth(month: month, day: day)
             }
         }
     }
-    private func generalThrow(every: Int, day: Int) throws(RecurrenceRuleError)
-    {
-        guard every >= 1 else {
+    private static func generalThrow(
+        every: Int,
+        allowed: ClosedRange<Int>,
+        day: Int
+    ) throws(RecurrenceRuleError) {
+        guard allowed.contains(every) else {
             throw .intervalShouldBeGraterThanZero(every)
         }
         guard (1...31).contains(day) else {
             throw .dayOutOfRange(day)
         }
     }
-    public static func monthly(
-        interval: Int = 1,
-        anchoring date: Date,
-        calendar: Calendar = Calendar.current
-    ) -> RecurrenceRule {
-        .monthly(
-            every: interval,
-            day: calendar.component(.day, from: date)
-        )
-        //        RecurrenceRule(unit: .month,
-        //                       interval: interval,
-        //                       dayAnchor: calendar.component(.day, from: date))
-    }
-
-    public static func yearly(
-        interval: Int = 1,
-        anchoring date: Date,
-        calendar: Calendar = Calendar.current
-    ) -> RecurrenceRule {
-        .yearly(
-            every: interval,
-            month: calendar.component(.month, from: date),
-            day: calendar.component(.day, from: date)
-        )
-        //        RecurrenceRule(unit: .year,
-        //                       interval: interval,
-        //                       dayAnchor: calendar.component(.day, from: date),
-        //                       monthAnchor: calendar.component(.month, from: date))
-    }
-
 }
 //Anchors
 extension RecurrenceRule {
@@ -133,115 +96,97 @@ extension RecurrenceRule {
         to date: Date,
         every: Int = 1,
         in calendar: Calendar
-    ) -> RecurrenceRule {
-        .monthly(every: every, day: calendar.component(.day, from: date))
+    ) throws(RecurrenceRuleError) -> RecurrenceRule {
+        try RecurrenceRule(
+            .monthly(day: calendar.component(.day, from: date)),
+            every: every
+        )
     }
     public static func yearlyAnchored(
         to date: Date,
         every: Int = 1,
         in calendar: Calendar
-    ) -> RecurrenceRule {
-        .yearly(
-            every: every,
-            month: calendar.component(.month, from: date),
-            day: calendar.component(.day, from: date)
+    ) throws(RecurrenceRuleError) -> RecurrenceRule {
+        try RecurrenceRule(
+            .yearly(
+                month: calendar.component(.month, from: date),
+                day: calendar.component(.day, from: date)
+            ),
+            every: every
         )
     }
     private var dayAnchor: Int {
-        switch self {
-        case .monthly(every: _, let day),
-            .yearly(every: _, month: _, let day):
+        switch frequency {
+        case .monthly(let day), .yearly(_, let day):
             day
         }
     }
 }
 extension RecurrenceRule {
-    public func occurrence(_ step: Int, from start: Date, in calendar: Calendar)
-        -> Date?
-    {
-        guard isValid else {
-            //Trowable with clear error here.
-            return nil
-        }
-        var firstOfMonth: Date
-        switch self {
-        case .monthly(let every, day: _):
-            //first make sure we dont obrain a overflow here
-            let (_, overflow) = step.multipliedReportingOverflow(by: every)
-            guard !overflow,
-                let startMonth = calendar.dateInterval(of: .month, for: start)?
-                    .start,
-                let target = calendar.date(
-                    byAdding: .month,
-                    value: step * every,
-                    to: startMonth
-                )
-            else {
-                return nil
-            }
+    public func occurrence(_ step: Int, from start: Date, in calendar: Calendar) throws(RecurrenceRuleError) -> Date {
+        let offset = step.multipliedReportingOverflow(by: interval)
+        guard !offset.overflow else { throw .dateOutOfRange }
 
-            firstOfMonth = target
+        let year: Int
+        let month: Int
+        switch frequency {
+        case .monthly:
+            // Count months from year 0 so one addition moves across years.
+            let startMonthIndex = calendar.component(.year, from: start) * 12 + calendar.component(.month, from: start) - 1
+            let target = startMonthIndex.addingReportingOverflow(offset.partialValue)
+            guard !target.overflow, target.partialValue >= 0 else { throw .dateOutOfRange }
+            year = target.partialValue / 12
+            month = target.partialValue % 12 + 1
+        case .yearly(let anchorMonth, _):
+            let target = calendar.component(.year, from: start).addingReportingOverflow(offset.partialValue)
+            guard !target.overflow else { throw .dateOutOfRange }
+            year = target.partialValue
+            month = anchorMonth
+        }
 
-        case .yearly(let every, let month, day: _):
-            let (years, overflow) = step.multipliedReportingOverflow(by: every)
-            let (year, overflow2) = calendar.component(.year, from: start)
-                .addingReportingOverflow(years)
-            guard !overflow, !overflow2,
-                let target = calendar.date(
-                    from: DateComponents(year: year, month: month, day: 1)
-                )
-            else {
-                return nil
-            }
-            firstOfMonth = target
-        }
-        guard
-            let daysInMonth = calendar.range(
-                of: .day,
-                in: .month,
-                for: firstOfMonth
-            )?.count
-        else {
-            return nil
-        }
-        let day = min(dayAnchor, daysInMonth)
-        return calendar.date(byAdding: .day, value: day - 1, to: firstOfMonth)
+        guard Self.supportedYears.contains(year),
+              let firstOfMonth = calendar.date(from: DateComponents(year: year, month: month, day: 1)),
+              let daysInMonth = calendar.range(of: .day, in: .month, for: firstOfMonth)?.count,
+              let result = calendar.date(byAdding: .day, value: min(dayAnchor, daysInMonth) - 1, to: firstOfMonth)
+        else { throw .dateOutOfRange }
+        return result
     }
+
     public func nextOccurrence(
         after reference: Date,
         from start: Date,
         in calendar: Calendar
-    ) -> Date? {
+    ) throws(RecurrenceRuleError) -> Date {
         let limit = calendar.startOfDay(for: max(reference, start))
+        let maxSteps = Self.supportedYears.count * 12
         var step = 1
-        while let candidate = occurrence(step, from: start, in: calendar) {
-            if candidate > limit {
-                return candidate
-            }
+        while step <= maxSteps {
+            let candidate = try occurrence(step, from: start, in: calendar)
+            if candidate > limit { return candidate }
             step += 1
         }
-        return nil
+        throw .dateOutOfRange
     }
 }
 extension RecurrenceRule {
     //simple validation when need conditional
-    public var isValid: Bool {
-        do {
-            try validate()
-            return true
-        } catch {
-            return false
-        }
-        //        switch self {
-        //        case let .monthly(every: every, day: day):
-        //            return every >= 1 && (1...31).contains(day) //day can be any day. beecause it will float base on the month
-        //        case let .yearly(every: every, month: month, day: day):
-        //            guard every >= 1, (1...12).contains(month) else {
-        //                return false;
-        //            }
-        //            return (1...Self.lastDayOfTheMonth(in: month)).contains(day)
-        //        }
-    }
+//    public var isValid: Bool {
+//        do {
+//            try validate()
+//            return true
+//        } catch {
+//            return false
+//        }
+//        //        switch self {
+//        //        case let .monthly(every: every, day: day):
+//        //            return every >= 1 && (1...31).contains(day) //day can be any day. beecause it will float base on the month
+//        //        case let .yearly(every: every, month: month, day: day):
+//        //            guard every >= 1, (1...12).contains(month) else {
+//        //                return false;
+//        //            }
+//        //            return (1...Self.lastDayOfTheMonth(in: month)).contains(day)
+//        //        }
+//    }
     private static func lastDayOfTheMonth(in month: Int) -> Int {
         switch month {
         //TODO: Maybe add "in year" here.. will help in testability and also make sure the validatino is ok.

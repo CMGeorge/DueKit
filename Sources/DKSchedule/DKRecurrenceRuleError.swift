@@ -6,9 +6,10 @@
 //
 
 //errors on validation
-public enum RecurrenceRuleError: Error {
+public enum RecurrenceRuleError: Error, Equatable, Sendable {
     case intervalShouldBeGraterThanZero(Int)
     case dayOutOfRange(Int)
     case monthOutOfRange(Int)
     case monthDayIsOutOfMonth(month: Int, day: Int)
+    case dateOutOfRange  
 }
