@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test (TZ=${{ matrix.tz }})
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        tz: [UTC, America/Los_Angeles, Pacific/Kiritimati]
+    env:
+      TZ: ${{ matrix.tz }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: swift --version
+      - run: swift build
+      - run: swift test
+
+  ios:
+    name: Build for iOS
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          xcodebuild build \
+            -scheme DueKit-Package \
+            -destination 'generic/platform=iOS Simulator'
