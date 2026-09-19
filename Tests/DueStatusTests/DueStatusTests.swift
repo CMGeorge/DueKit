@@ -43,9 +43,9 @@ private func at(
 
 @Suite("Policy")
 struct PolicyTests {
-    @Test("Default window is 1 day")
+    @Test("Default window is 7 day")
     func defaultWindow() throws {
-        #expect(try DueStatusPolicy().dueInDaysNotification == 1)
+        #expect(try DueStatusPolicy().dueInDaysNotification == 7)
     }
 
     @Test(
