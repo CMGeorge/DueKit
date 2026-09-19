@@ -7,8 +7,8 @@
 
 //errors on validation
 public enum RecurrenceRuleError: Error {
-    case intervalShouldBeGraterThanZero
-    case dayOutOfRange
-    case monthOutOfRange
+    case intervalShouldBeGraterThanZero(Int)
+    case dayOutOfRange(Int)
+    case monthOutOfRange(Int)
     case monthDayIsOutOfMonth(month: Int, day: Int)
 }
