@@ -26,6 +26,8 @@ let package = Package(
         .testTarget(name: "ScheduleTests",
                     dependencies: ["DKSchedule"]),
         .testTarget(name: "DueStatusTests",
-                    dependencies: ["DKDueStatus"])
+                    dependencies: ["DKDueStatus"]),
+        .testTarget(name: "RemindersTests",
+                    dependencies: ["DKReminders"])
     ]
 )
