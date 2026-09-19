@@ -332,4 +332,47 @@ struct TimeTests {
                 == DateComponents(year: 2027, month: 2, day: 28)
         )
     }
+
+    @Test(
+        "Every monthly occurrence stays on the anchored day through clock changes",
+        arguments: [
+            "Europe/Bucharest", "America/Santiago", "America/New_York",
+            "Pacific/Auckland", "Australia/Lord_Howe", "Asia/Tehran",
+        ]
+    )
+    func clockChangesAllYear(identifier: String) throws {
+        let zoned = Calendar.dueKit(
+            timeZone: try #require(TimeZone(identifier: identifier))
+        )
+        let start = zoned.date(
+            from: DateComponents(year: 2026, month: 1, day: 31)
+        )!
+        let rule = try RecurrenceRule(monthlyEvery: 1, on: 31)
+        for step in 0...24 {
+            let date = try rule.occurrence(step, from: start, in: zoned)
+            let daysInMonth = zoned.range(of: .day, in: .month, for: date)!.count
+            #expect(zoned.component(.day, from: date) == min(31, daysInMonth))
+            #expect(date == zoned.startOfDay(for: date))
+        }
+    }
+
+    @Test("A day without midnight (Chile, 6 Sep 2026) is still the right day")
+    func missingMidnight() throws {
+        // Santiago jumps from 24:00 to 01:00 on 6 Sep 2026, so that day starts at 01:00.
+        let santiago = Calendar.dueKit(
+            timeZone: try #require(TimeZone(identifier: "America/Santiago"))
+        )
+        let due = santiago.date(
+            from: DateComponents(year: 2026, month: 9, day: 6)
+        )!
+        let completed = santiago.date(
+            from: DateComponents(year: 2026, month: 9, day: 6, hour: 10)
+        )!
+        let rule = try RecurrenceRule(monthlyEvery: 1, on: 6)
+        let next = try rule.nextOccurrence(after: completed, from: due, in: santiago)
+        #expect(
+            santiago.dateComponents([.year, .month, .day], from: next)
+                == DateComponents(year: 2026, month: 10, day: 6)
+        )
+    }
 }
